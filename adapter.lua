@@ -1,6 +1,6 @@
 package.path = './deps/?.lua;' .. package.path
 pcall(require, 'luarocks.require')
-
+local uuid   = require('uuid')
 local nats = require 'nats'
 local http_server = require "http.server"
 local http_headers = require "http.headers"
@@ -17,7 +17,30 @@ local client = nats.connect(params)
 -- client:set_auth('user', 'password')
 client:connect()
 
+
+local function callback(message)
+	print("Ack Received", message)
+end
+
+local function create_inbox()
+    return '_INBOX.' .. uuid()
+end
+
+
+local function publish_message()
+	local msg = coroutine.yield()
+	local inbox = create_inbox()
+    unique_id = client:subscribe(inbox, function(message, reply)
+        client:unsubscribe(unique_id)
+		callback(message, reply)
+    end)
+
+	client:publish("foo", msg, inbox)
+end
+
 local function reply(myserver, stream) -- luacheck: ignore 212
+	co = coroutine.create(publish_message)
+	coroutine.resume(co)
 	-- Read in headers
 	local req_headers = assert(stream:get_headers())
 	local req_method = req_headers:get ":method"
@@ -44,7 +67,7 @@ local function reply(myserver, stream) -- luacheck: ignore 212
     end
     
     local body = stream:get_body_as_string(1)
-    client:publish('Mesaage', body)
+	coroutine.resume(co, body)
 end
 
 local listen = assert(http_server.listen {
