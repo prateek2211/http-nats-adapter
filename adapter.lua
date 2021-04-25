@@ -36,6 +36,7 @@ local function publish_message()
     end)
 
 	client:publish("foo", msg, inbox)
+	client:wait(1)
 end
 
 local function reply(myserver, stream) -- luacheck: ignore 212
